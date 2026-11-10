@@ -40,20 +40,72 @@ Every choice has a trade-off:
 **What's the smartest strategy for the robot?** We test different strategies, or "policies,"
 in a simulation, run each one a thousand times, and compare their scores.
 
-So far we've tried simple rules of thumb:
-- **Greedy:** pick everything, never give up. It does terribly: it wastes time on rotten fruit
-  and runs its battery dead.
-- **Threshold:** skip fruit that looks bad or too hard. It does much better.
-- **Rate-based:** only pick a fruit if it's worth the time. It's the best so far.
+### Results so far
 
-One clear finding is that **the sensor is worth using**. Checking fruit before picking adds
-about 13 points per session.
+The robot has 200 time units to work through a field of about 100 fruits. Every strategy is
+tested on the **same 1000 randomly generated fields with the same luck**, so differences in
+score come from the strategy and not from chance.
+
+#### Without weather
+
+| Strategy | What it does | Avg. score |
+|---|---|---|
+| **Rate-based** (with sensor) | Picks a fruit only if it's worth the time | **40.1** |
+| Threshold, strict (with sensor) | Skips fruit that looks bad or hard, with stricter cut-offs | 36.9 |
+| Threshold (with sensor) | Skips fruit that looks bad or hard | 34.5 |
+| Threshold (no sensor) | Same, but never checks fruit quality | 20.9 |
+| Random | Picks actions at random | 5.7 |
+| **Greedy** | Picks everything and never gives up | **−31.3** |
+
+- **Being selective wins.** In a typical session, the best strategy picks about 22 good fruits
+  and only 2–3 rotten ones, and damages a plant less than once. It skips about half the fruit,
+  because spending time on unpromising fruit isn't worth it.
+- **Greedy is a disaster.** It picks about as many good fruits as the best strategy (21), but
+  also about 14 rotten ones, damages about 5 plants, and drains its battery completely in about
+  29% of sessions.
+- **The quality sensor is worth using.** With the sensor, the threshold strategy scores about
+  13.5 points more. Without it, the strategy picks slightly *more* good fruit but also 15
+  rotten ones, because it can't tell them apart.
+- **Fine-tuning barely matters.** A "pickier" version of the rate-based strategy scores the same
+  (40.1). What matters is the overall approach, not the exact cut-off.
+
+#### With weather (preliminary)
+
+Rain and heat make picking harder, and rain makes damaging plants more likely. We tried two
+versions: one where the robot can see the weather, and one where it has to spend time checking.
+
+| Strategy | Can see weather | Hidden weather |
+|---|---|---|
+| Rate-based | 36.2 | 36.2 |
+| Rate-based, waits out bad weather | 36.2 | 32.7* |
+| Rate-based, checks weather every 10 time units | not applicable | 32.7 |
+| Greedy | −35.7 | −35.7 |
+
+\* Because of a bug, this strategy never actually waits. It ends up behaving exactly like the
+"checks weather" strategy.
+
+- **Bad weather costs about 4 points per session** (40 → 36). Fewer picks succeed, so the robot
+  picks about 1–2 fewer good fruits and damages a few more plants.
+- **Knowing the weather doesn't help yet.** The rate-based strategy scores the same whether it
+  can see the weather or not.
+- **Checking the weather costs more than it's worth.** Checking every 10 time units uses up time
+  that could go to picking, and scores about 3.6 points worse.
+- **Waiting out bad weather barely helps** (+0.002 points). Weather only lasts about 10 time
+  units, and the robot usually has another fruit to work on.
+
+**The big picture:** simple rules already do well, and the rate-based rule is the best so far.
+But we don't know yet how good "well" is. That's what the next steps are for.
+
+Full numbers: `results/baseline_20261110_121831/summary.csv`,
+`results/weather_observed_20261110_124410/summary.csv`,
+`results/weather_hidden_20261110_124550/summary.csv`.
 
 ### What's next
 
-1. Build a **"cheating" robot** that knows everything: which fruits are good and how hard
+1. Fix the "wait out bad weather" bug and re-run the weather experiments.
+2. Build a **"cheating" robot** that knows everything: which fruits are good and how hard
    each is to pick. It shows the best score that's even possible.
-2. Build a robot that **plans ahead** using decision-making methods from CS238, like value
+3. Build a robot that **plans ahead** using decision-making methods from CS238, like value
    iteration or tree search.
 
 Then we can see how close our strategies get to the best possible score, and whether careful
