@@ -33,7 +33,7 @@ class Policy:
             return action
         if Action.RECHARGE in valid:
             return Action.RECHARGE
-        safe = [a for a in (Action.SKIP, Action.CHECK, Action.HARVEST)
+        safe = [a for a in (Action.WAIT, Action.SKIP, Action.CHECK, Action.HARVEST)
                 if a in valid and not self.would_die(obs, a)]
         return safe[0] if safe else action
 

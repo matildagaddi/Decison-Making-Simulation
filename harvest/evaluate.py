@@ -13,7 +13,7 @@ from .config import Config
 from .env import HarvestEnv
 
 METRICS = ["reward", "discounted", "good", "bad", "damaged", "abandoned", "skipped",
-           "checks", "recharges", "dead", "actions", "time_used"]
+           "checks", "recharges", "dead", "weather_checks", "waits", "actions", "time_used"]
 
 
 @dataclass(frozen=True)
@@ -89,10 +89,10 @@ def summarize(rows, reference=None):
 
 def print_summary(summary):
     ref = summary[0]["reference"]
-    print(f"{'policy':<28}{'reward':>16}{'Δ vs ' + ref[:14]:>24}  "
+    print(f"{'policy':<34}{'reward':>16}{'Δ vs ' + ref[:14]:>24}  "
           f"{'good':>5} {'bad':>5} {'dmg':>5} {'dead':>5} {'chk':>5} {'rech':>5} {'time':>5}")
     for s in summary:
-        print(f"{s['policy']:<28}{s['reward']:8.2f} ±{s['reward_ci95']:5.2f}"
+        print(f"{s['policy']:<34}{s['reward']:8.2f} ±{s['reward_ci95']:5.2f}"
               f"{s['diff_vs_ref']:15.2f} ±{s['diff_ci95']:5.2f}  "
               f"{s['good']:5.1f} {s['bad']:5.1f} {s['damaged']:5.1f} {s['dead']:5.3f} "
               f"{s['checks']:5.1f} {s['recharges']:5.1f} {s['time_used']:5.0f}")

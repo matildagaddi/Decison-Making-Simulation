@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass, field, fields
 from typing import Optional
 
 EASY, HARD = 0, 1
+NORMAL, RAIN, HEAT = 0, 1, 2
+WEATHER_NAMES = ("normal", "rain", "heat")
 
 
 @dataclass
@@ -52,6 +54,36 @@ class Config:
     r_damage: float = -2.0
     r_low: float = -2.0         # PER TIME UNIT spent below low_battery
     r_dead: float = -10.0       # battery hits zero (episode ends)
+
+    # ---- WAIT action (opt-in): idle for wait_time, no battery cost ----
+    allow_wait: bool = False
+    wait_time: int = 1
+
+    # ---- weather (opt-in) ----
+    # A Markov chain over {NORMAL, RAIN, HEAT} that steps every `weather_period` time units.
+    # The weather path is exogenous (it depends only on elapsed time and the outcome seed),
+    # so every policy faces the same weather in a scenario.
+    weather: bool = False
+    weather_observed: bool = True     # False: weather is hidden; CHECK_WEATHER reads it
+    weather_period: int = 10
+    weather_init: list = field(default_factory=lambda: [1.0, 0.0, 0.0])
+    weather_P: list = field(default_factory=lambda: [[0.7, 0.2, 0.1],    # from NORMAL
+                                                     [0.4, 0.6, 0.0],    # from RAIN
+                                                     [0.4, 0.0, 0.6]])   # from HEAT
+    # P(success | theta, w) = success_mult[w] * theta
+    weather_success_mult: dict = field(default_factory=lambda: {NORMAL: 1.0, RAIN: 0.6, HEAT: 0.85})
+    # P(damage | k failures, d, w) = min(1, damage_base[d] * damage_mult[w] * k)
+    weather_damage_mult: dict = field(default_factory=lambda: {NORMAL: 1.0, RAIN: 1.5, HEAT: 1.0})
+    weather_check_time: int = 1
+    weather_check_cost: float = 0.005
+    weather_sens_acc: float = 1.0     # P(reading = true weather); errors split evenly
+
+    # ---- derived ----
+    def weather_mult(self, w):
+        """(success multiplier, damage multiplier) for weather w; (1, 1) when weather is off."""
+        if not self.weather:
+            return 1.0, 1.0
+        return self.weather_success_mult[w], self.weather_damage_mult[w]
 
     # ---- serialisation ----
     def to_dict(self):

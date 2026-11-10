@@ -139,3 +139,122 @@ def test_evaluate_runs_and_paired_diff_zero_for_reference():
     s = summarize(rows)
     assert s[0]["diff_vs_ref"] == 0
     assert traj and {"reading", "duration", "reward"} <= set(traj[0])
+
+
+# ---------------- weather and WAIT ----------------
+from harvest.belief import posterior_mean_theta
+from harvest.config import HEAT, NORMAL, RAIN
+from harvest.env import generate_weather_path
+
+
+def test_defaults_have_no_weather_or_wait():
+    env = HarvestEnv(Config())
+    obs = env.reset(fruits=[Fruit(0, EASY, True, 0.5)])
+    assert "weather" not in obs
+    assert set(env.valid_actions()) == {Action.HARVEST, Action.SKIP, Action.CHECK, Action.RECHARGE}
+
+
+def test_weather_action_sets():
+    fruits = [Fruit(0, EASY, True, 0.5)]
+    obs_env = HarvestEnv(Config(weather=True))
+    obs = obs_env.reset(fruits=fruits)
+    assert obs["weather"] is not None and Action.CHECK_WEATHER not in obs_env.valid_actions()
+    hid_env = HarvestEnv(Config(weather=True, weather_observed=False, allow_wait=True))
+    obs = hid_env.reset(fruits=fruits)
+    assert obs["weather"] is None
+    assert {Action.CHECK_WEATHER, Action.WAIT} <= set(hid_env.valid_actions())
+
+
+def test_weather_path_exogenous_and_deterministic():
+    cfg = Config(weather=True)
+    a, b = generate_weather_path(cfg, 7), generate_weather_path(cfg, 7)
+    assert (a == b).all() and len(a) == cfg.session_time + 1
+    assert (a[:cfg.weather_period] == a[0]).all()          # constant within a period
+    sc = make_scenarios(1, seed=2)[0]
+    paths = []
+    for factory in baseline_policies(cfg).values():
+        env = HarvestEnv(cfg)
+        run_episode(env, factory(cfg), sc)
+        paths.append(env.weather_path)
+    assert all((p == paths[0]).all() for p in paths)
+
+
+def test_rain_scales_success_and_counts_failures_by_weather():
+    cfg = Config(weather=True, weather_success_mult={NORMAL: 1.0, RAIN: 0.0, HEAT: 1.0},
+                 damage_base={EASY: 0.0, HARD: 0.0})
+    env = HarvestEnv(cfg)
+    rain = np.full(cfg.session_time + 1, RAIN)
+    env.reset(fruits=[Fruit(0, EASY, True, 1.0)] * 2, weather_path=rain)
+    obs, _, _, info = env.step(Action.HARVEST)
+    assert info["success"] is False and info["weather"] == RAIN
+    assert obs["fail_weather"] == (0, 1, 0)
+
+
+def test_rain_raises_damage():
+    cfg = Config(weather=True, damage_base={EASY: 0.5, HARD: 0.5},
+                 weather_damage_mult={NORMAL: 1.0, RAIN: 2.0, HEAT: 1.0})
+    env = HarvestEnv(cfg)
+    env.reset(fruits=[Fruit(0, EASY, True, 0.0)] * 2,
+              weather_path=np.full(cfg.session_time + 1, RAIN))
+    assert env.step(Action.HARVEST)[3]["damaged"]          # p = min(1, 0.5 * 2 * 1) = 1
+
+
+def test_posterior_mean_theta():
+    assert posterior_mean_theta(3, 5, [(1.0, 4)]) == pytest.approx(3 / 12)
+    # quadrature path agrees with the closed form as m -> 1
+    assert posterior_mean_theta(3, 5, [(1 - 1e-9, 4)]) == pytest.approx(3 / 12, abs=1e-4)
+    # failures under rain are weaker evidence against theta than failures in normal weather
+    assert posterior_mean_theta(3, 5, [(0.6, 4)]) > posterior_mean_theta(3, 5, [(1.0, 4)])
+    # Monte Carlo check of the weighted posterior
+    rng = np.random.default_rng(0)
+    th = rng.beta(3, 5, 400_000)
+    w = (1 - 0.6 * th) ** 3 * (1 - th) ** 2
+    mc = (w * th).sum() / w.sum()
+    assert posterior_mean_theta(3, 5, [(0.6, 3), (1.0, 2)]) == pytest.approx(mc, abs=2e-3)
+
+
+def test_weather_filter():
+    cfg = Config(weather=True, weather_observed=False)
+    bt = BeliefTracker(cfg)
+    P = np.asarray(cfg.weather_P)
+    base = dict(difficulty=EASY, attempts=0, readings=())
+    assert bt.p_weather(dict(base, elapsed=0, weather=None, weather_readings=())) \
+        == pytest.approx(cfg.weather_init)
+    seen_rain = dict(base, weather=None, weather_readings=((13, RAIN),))
+    assert bt.p_weather(dict(seen_rain, elapsed=15)) == pytest.approx([0, 1, 0])
+    assert bt.p_weather(dict(seen_rain, elapsed=22)) == pytest.approx(P[RAIN])
+    # a reading that is impossible under the model falls back to the reading itself
+    impossible = dict(base, weather=None, weather_readings=((3, RAIN),), elapsed=3)
+    assert bt.p_weather(impossible) == pytest.approx([0, 1, 0])
+    noisy = BeliefTracker(Config(weather=True, weather_observed=False, weather_sens_acc=0.8))
+    pw = noisy.p_weather(dict(seen_rain, elapsed=15))
+    assert pw[RAIN] < 1 and pw.sum() == pytest.approx(1)
+
+
+def test_wait_costs_time_not_battery():
+    cfg = Config(allow_wait=True)
+    env = HarvestEnv(cfg)
+    env.reset(fruits=[Fruit(0, EASY, True, 0.5)])
+    env.battery = 0.05
+    _, r, _, info = env.step(Action.WAIT)
+    assert env.battery == 0.05 and info["duration"] == cfg.wait_time
+    assert r == pytest.approx(cfg.r_low * cfg.wait_time)
+
+
+def test_weather_config_roundtrip(tmp_path):
+    cfg = Config(weather=True, weather_observed=False, allow_wait=True, weather_sens_acc=0.9)
+    p = tmp_path / "c.json"
+    cfg.save(p)
+    assert Config.load(p) == cfg
+
+
+@pytest.mark.parametrize("observed", [True, False])
+def test_evaluate_with_weather(observed):
+    cfg = Config(weather=True, weather_observed=observed, allow_wait=True)
+    pols = baseline_policies(cfg)
+    assert "rate (sensor, wait out weather)" in pols
+    rows, _ = evaluate(pols, cfg, make_scenarios(10))
+    by = {r["policy"]: r for r in rows}
+    assert by["rate (sensor, wait out weather)"]["waits"] >= 0
+    if not observed:
+        assert sum(r["weather_checks"] for r in rows if "check weather" in r["policy"]) > 0

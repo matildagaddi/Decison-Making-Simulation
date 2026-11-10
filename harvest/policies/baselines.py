@@ -51,26 +51,49 @@ class ThresholdPolicy(Policy):
 
 
 class RatePolicy(Policy):
-    """Harvest only if immediate expected reward per unit harvest time >= min_rate."""
+    """Harvest only if immediate expected reward per unit harvest time >= min_rate.
+
+    Weather options (only used when cfg.weather is on):
+      weather_check_every  hidden weather: CHECK_WEATHER when the last reading is at least
+                           this old (None = never check)
+      wait_bad_weather     if WAIT is enabled and the fruit would pass the rate test in normal
+                           weather but fails it under the current weather belief, WAIT
+    """
     name = "rate"
 
-    def __init__(self, cfg, recharge_below=0.25, min_rate=0.5, use_sensor=True, guard=True, **kw):
+    def __init__(self, cfg, recharge_below=0.25, min_rate=0.5, use_sensor=True, guard=True,
+                 weather_check_every=None, wait_bad_weather=False, **kw):
         super().__init__(cfg, **kw)
         self.recharge_below, self.min_rate = recharge_below, min_rate
         self.use_sensor, self.guard = use_sensor, guard
+        self.weather_check_every, self.wait_bad_weather = weather_check_every, wait_bad_weather
+
+    def _rate(self, obs, p_success, p_good):
+        c = self.cfg
+        return p_success * (p_good * c.r_good + (1 - p_good) * c.r_bad) / c.harvest_time[obs["difficulty"]]
+
+    def _needs_weather_check(self, obs, valid):
+        if self.weather_check_every is None or Action.CHECK_WEATHER not in valid:
+            return False
+        reads = obs.get("weather_readings", ())
+        return not reads or obs["elapsed"] - reads[-1][0] >= self.weather_check_every
 
     def act(self, obs, valid):
         c = self.cfg
         if (obs["battery"] < self.recharge_below and Action.RECHARGE in valid
                 and obs["time_left"] > c.recharge_time + 2):
             return Action.RECHARGE
-        if self.use_sensor and obs["attempts"] == 0 and not obs["readings"]:
+        if self._needs_weather_check(obs, valid):
+            a = Action.CHECK_WEATHER
+        elif self.use_sensor and obs["attempts"] == 0 and not obs["readings"]:
             a = Action.CHECK
         else:
             b = self.belief(obs)
-            pg = b["p_good"]
-            exp_r = b["p_success"] * (pg * c.r_good + (1 - pg) * c.r_bad)
-            rate = exp_r / c.harvest_time[obs["difficulty"]]
-            a = Action.HARVEST if rate >= self.min_rate else Action.SKIP
+            ok = self._rate(obs, b["p_success"], b["p_good"]) >= self.min_rate
+            a = Action.HARVEST if ok else Action.SKIP
+            if not ok and self.wait_bad_weather and Action.WAIT in valid and c.weather:
+                normal = dict(obs, weather=0, fail_weather=obs.get("fail_weather", (obs["attempts"], 0, 0)))
+                if self._rate(obs, self.belief.p_success(normal), b["p_good"]) >= self.min_rate:
+                    a = Action.WAIT
         a = self.fallback(a, valid)
         return self.battery_guard(obs, a, valid) if self.guard else a
