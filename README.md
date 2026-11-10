@@ -18,6 +18,7 @@ results/<exp>_<stamp>/ config.json, meta.json (git commit, seed), summary/episod
 ## Run
 ```
 python -m harvest.experiments.baseline --episodes 1000 --seed 0
+python -m harvest.experiments.plot [results/<run>]   # figures -> <run>/figures (default: latest baseline)
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q tests
 ```
 
