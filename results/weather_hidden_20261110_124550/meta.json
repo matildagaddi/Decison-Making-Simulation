@@ -1,0 +1,27 @@
+{
+  "experiment": "weather_hidden",
+  "timestamp": "20261110_124550",
+  "scenario_seed": 0,
+  "n_episodes": 1000,
+  "argv": [
+    "/home/fortress/cs238/Decison-Making-Simulation/harvest/experiments/baseline.py",
+    "--episodes",
+    "1000",
+    "--seed",
+    "0",
+    "--set",
+    "weather=true",
+    "--set",
+    "weather_observed=false",
+    "--set",
+    "allow_wait=true",
+    "--name",
+    "weather_hidden"
+  ],
+  "numpy": "1.26.4",
+  "python": "3.10.12",
+  "git": {
+    "commit": "48de577d802df1b717aa3deb519fe61904b1a20f",
+    "dirty": true
+  }
+}

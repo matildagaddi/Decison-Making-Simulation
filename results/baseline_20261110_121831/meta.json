@@ -1,0 +1,15 @@
+{
+  "experiment": "baseline",
+  "timestamp": "20261110_121831",
+  "scenario_seed": 0,
+  "n_episodes": 1000,
+  "argv": [
+    "/home/fortress/cs238/Decison-Making-Simulation/harvest/experiments/baseline.py"
+  ],
+  "numpy": "1.26.4",
+  "python": "3.10.12",
+  "git": {
+    "commit": "5a7514069ad7193f48ab190eb73759da6dc0914e",
+    "dirty": true
+  }
+}

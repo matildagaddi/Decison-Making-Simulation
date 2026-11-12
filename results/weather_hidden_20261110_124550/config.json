@@ -1,0 +1,97 @@
+{
+  "n_plants": 20,
+  "mean_fruits_per_plant": 5.0,
+  "min_fruits_per_plant": 1,
+  "p_hard": 0.4,
+  "p_good": 0.6,
+  "true_beta": {
+    "0": [
+      8,
+      2
+    ],
+    "1": [
+      3,
+      5
+    ]
+  },
+  "prior_beta": {
+    "0": [
+      4,
+      1
+    ],
+    "1": [
+      2,
+      3
+    ]
+  },
+  "session_time": 200,
+  "gamma": 0.99,
+  "harvest_cost": {
+    "0": 0.02,
+    "1": 0.06
+  },
+  "sensor_cost": 0.005,
+  "move_cost": 0.005,
+  "recharge_rate": 0.3,
+  "low_battery": 0.1,
+  "harvest_time": {
+    "0": 1,
+    "1": 2
+  },
+  "check_time": 1,
+  "move_time": 1,
+  "recharge_time": 10,
+  "damage_base": {
+    "0": 0.05,
+    "1": 0.1
+  },
+  "max_attempts": null,
+  "sens_tp": 0.85,
+  "sens_fp": 0.15,
+  "sens_rho": 0.0,
+  "r_good": 2.0,
+  "r_bad": -1.0,
+  "r_damage": -2.0,
+  "r_low": -2.0,
+  "r_dead": -10.0,
+  "allow_wait": true,
+  "wait_time": 1,
+  "weather": true,
+  "weather_observed": false,
+  "weather_period": 10,
+  "weather_init": [
+    1.0,
+    0.0,
+    0.0
+  ],
+  "weather_P": [
+    [
+      0.7,
+      0.2,
+      0.1
+    ],
+    [
+      0.4,
+      0.6,
+      0.0
+    ],
+    [
+      0.4,
+      0.0,
+      0.6
+    ]
+  ],
+  "weather_success_mult": {
+    "0": 1.0,
+    "1": 0.6,
+    "2": 0.85
+  },
+  "weather_damage_mult": {
+    "0": 1.0,
+    "1": 1.5,
+    "2": 1.0
+  },
+  "weather_check_time": 1,
+  "weather_check_cost": 0.005,
+  "weather_sens_acc": 1.0
+}
